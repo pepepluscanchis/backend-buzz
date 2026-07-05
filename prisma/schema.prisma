@@ -1,0 +1,97 @@
+// 1. Configuración del Cliente Prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+// 2. Conexión a la Base de Datos (Usa la URL de tu archivo .env)
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// --- MODELOS DE NEGOCIO PARA BUZZ ---
+
+// 3. Usuarios (Admin de California, Choferes y Pasajeros)
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String?
+  name      String
+  role      String   @default("PASSENGER") // ADMIN, DRIVER, PASSENGER
+  authProvider String @default("LOCAL") // LOCAL, GOOGLE
+  vehiclePlate String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relación: Un usuario puede pertenecer a una empresa
+  companyId String?
+  company   Company? @relation(fields: [companyId], references: [id])
+}
+
+// 4. Empresa de Transportes
+model Company {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  ruc       String   @unique
+  createdAt DateTime @default(now())
+
+  // Relaciones
+  users   User[]
+  buses   Bus[]
+  routes  Route[] // Las rutas que le pertenecen a la empresa
+}
+
+// 5. Unidades / Micros
+model Bus {
+  id          String   @id @default(uuid())
+  plate       String   @unique // Placa del micro (ej: T1A-123)
+  model       String   // Modelo del bus
+  capacity    Int      // Capacidad de pasajeros
+  unitNumber  String?  // Número interno (ej: "M-45")
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt // 👈 ¡SOLUCIONADO! Le pusimos el default para salvar tus datos viejos
+
+  // Relación: Cada bus pertenece a una empresa
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
+
+  // Relación opcional con la Ruta (para saber qué recorrido le toca)
+  routeId   String?
+  route     Route?  @relation(fields: [routeId], references: [id])
+}
+
+// 6. Rutas (El Trazado del Mapa)
+model Route {
+  id          String   @id @default(uuid())
+  name        String
+  pathCoords  Json?
+  publicLetter String?
+  colorHex    String?
+  badge       String?
+  isActive    Boolean  @default(true)
+  
+  // Relaciones
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id])
+  buses       Bus[]    // Los micros que operan esta ruta
+  stops       Stop[]   // Los paraderos de esta ruta
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// 7. Paraderos
+model Stop {
+  id          String   @id @default(uuid())
+  name        String   // Ej: "Paradero Óvalo Papal", "Paradero UCV"
+  latitude    Float    // Coordenada GPS
+  longitude   Float    // Coordenada GPS
+  
+  // Relaciones
+  routeId     String
+  route       Route    @relation(fields: [routeId], references: [id])
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
