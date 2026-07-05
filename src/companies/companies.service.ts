@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { CreateCompanyDto } from './dto/create-company.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
 import { PrismaService } from '../prisma/prisma.service';
@@ -7,15 +7,23 @@ import { PrismaService } from '../prisma/prisma.service';
 export class CompaniesService {
   constructor(private prisma: PrismaService) {}
 
-  async create(createCompanyDto: CreateCompanyDto) {
-    return this.prisma.company.create({
+  async create(createCompanyDto: CreateCompanyDto, adminUserId: string) {
+    const company = await this.prisma.company.create({
       data: createCompanyDto,
     });
+
+    // Vinculamos al admin que la creó con su nueva empresa.
+    await this.prisma.user.update({
+      where: { id: adminUserId },
+      data: { companyId: company.id },
+    });
+
+    return company;
   }
 
-  // Trae todas las empresas con sus buses y usuarios vinculados
   async findAll() {
     return this.prisma.company.findMany({
+      take: 200,
       include: {
         buses: true,
         users: true,
@@ -23,18 +31,22 @@ export class CompaniesService {
     });
   }
 
-  // Trae una empresa específica con todo su detalle
   async findOne(id: string) {
-    return this.prisma.company.findUnique({
+    const company = await this.prisma.company.findUnique({
       where: { id },
       include: {
         buses: true,
         users: true,
       },
     });
+    if (!company) {
+      throw new NotFoundException(`Empresa ${id} no encontrada`);
+    }
+    return company;
   }
 
   async update(id: string, updateCompanyDto: UpdateCompanyDto) {
+    await this.findOne(id);
     return this.prisma.company.update({
       where: { id },
       data: updateCompanyDto,
@@ -42,6 +54,7 @@ export class CompaniesService {
   }
 
   async remove(id: string) {
+    await this.findOne(id);
     return this.prisma.company.delete({
       where: { id },
     });

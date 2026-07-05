@@ -1,40 +1,69 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+  Request,
+  ForbiddenException,
+} from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { AuthGuard } from '../auth/auth.guard'; 
+import { AuthGuard } from '../auth/auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
 
-@Controller('users') // Le quitamos el candado principal a todo el modulo
+@UseGuards(AuthGuard, RolesGuard)
+@Controller('users')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
+  // Solo un ADMIN puede dar de alta choferes/otros admins de su propia empresa.
+  // El auto-registro de pasajeros va por POST /auth/register.
+  @Roles('ADMIN')
   @Post()
-  // Esta ruta queda libre para que te puedas registrar por primera vez
-  create(@Body() createUserDto: CreateUserDto) {
-    return this.usersService.create(createUserDto);
+  create(@Body() createUserDto: CreateUserDto, @Request() req) {
+    return this.usersService.create(createUserDto, req.user.companyId);
   }
 
-  @UseGuards(AuthGuard) // Candado individual activado
+  @Roles('ADMIN')
   @Get()
-  findAll() {
-    return this.usersService.findAll();
+  findAll(@Request() req) {
+    return this.usersService.findAll(req.user.companyId);
   }
 
-  @UseGuards(AuthGuard) // Candado individual activado
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.usersService.findOne(id);
+  findOne(@Param('id') id: string, @Request() req) {
+    this.assertSelfOrAdmin(id, req);
+    return this.usersService.findOne(id, req.user.role === 'ADMIN' ? req.user.companyId : undefined);
   }
 
-  @UseGuards(AuthGuard) // Candado individual activado
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
-    return this.usersService.update(id, updateUserDto);
+  update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto, @Request() req) {
+    this.assertSelfOrAdmin(id, req);
+
+    // Un usuario editando su propio perfil no puede auto-ascenderse ni cambiarse de empresa.
+    if (req.user.role !== 'ADMIN') {
+      delete (updateUserDto as any).role;
+      delete (updateUserDto as any).companyId;
+    }
+
+    return this.usersService.update(id, updateUserDto, req.user.role === 'ADMIN' ? req.user.companyId : undefined);
   }
 
-  @UseGuards(AuthGuard) // Candado individual activado
+  @Roles('ADMIN')
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.usersService.remove(id);
+  remove(@Param('id') id: string, @Request() req) {
+    return this.usersService.remove(id, req.user.companyId);
+  }
+
+  private assertSelfOrAdmin(id: string, req: any) {
+    if (req.user.role !== 'ADMIN' && req.user.id !== id) {
+      throw new ForbiddenException('No puedes acceder a datos de otro usuario.');
+    }
   }
 }

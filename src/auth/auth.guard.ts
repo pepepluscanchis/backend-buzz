@@ -1,10 +1,14 @@
 import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { Request } from 'express';
 
 @Injectable()
 export class AuthGuard implements CanActivate {
-  constructor(private jwtService: JwtService) {}
+  constructor(
+    private jwtService: JwtService,
+    private configService: ConfigService,
+  ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<Request>();
@@ -18,9 +22,9 @@ export class AuthGuard implements CanActivate {
     try {
       // 2. Verificamos si el token es real y no ha expirado
       const payload = await this.jwtService.verifyAsync(token, {
-        secret: process.env.JWT_SECRET || 'SUPER_SECRETO_DE_BUZZ_2026',
+        secret: this.configService.getOrThrow<string>('JWT_SECRET'),
       });
-      
+
       // 3. Inyectamos los datos del usuario en la petición para usarlo después
       request['user'] = payload;
     } catch {

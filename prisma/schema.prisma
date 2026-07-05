@@ -52,6 +52,11 @@ model Bus {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @default(now()) @updatedAt // 👈 ¡SOLUCIONADO! Le pusimos el default para salvar tus datos viejos
 
+  // Última posición conocida (reportada por el gateway de tracking)
+  lastLat        Float?
+  lastLng        Float?
+  lastLocationAt DateTime?
+
   // Relación: Cada bus pertenece a una empresa
   companyId String
   company   Company @relation(fields: [companyId], references: [id])

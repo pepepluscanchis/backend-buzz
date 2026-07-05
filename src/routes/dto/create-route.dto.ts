@@ -5,9 +5,11 @@ export class CreateRouteDto {
   @IsNotEmpty()
   name!: string;
 
+  // La empresa siempre se deriva del usuario autenticado en el servidor;
+  // este campo ya no se usa aunque el cliente lo mande.
   @IsString()
-  @IsNotEmpty()
-  companyId!: string;
+  @IsOptional()
+  companyId?: string;
 
   @IsOptional()
   pathCoords?: any;
